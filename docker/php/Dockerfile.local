@@ -4,46 +4,61 @@ FROM dunglas/frankenphp:1.3-builder-php8.3.15
 # Read more: https://frankenphp.dev/docs/config/#environment-variables
 ENV SERVER_NAME="http://localhost"
 
-RUN apt-get update \
-    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+# Update packages and install system dependencies
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
     git \
     unzip \
+    libzip-dev \
+    zlib1g-dev \
     librabbitmq-dev \
     libpq-dev \
-    supervisor
+    supervisor \
+    && docker-php-ext-configure zip \
+    && docker-php-ext-install intl zip \
+    && docker-php-ext-enable intl zip \
+    && apt-get install -y libpq-dev \
+    && docker-php-ext-install pdo pdo_pgsql pgsql
 
-RUN install-php-extensions \
+
+# Install PHP extensions using install-php-extensions script
+RUN curl -sSL https://github.com/mlocati/docker-php-extension-installer/releases/latest/download/install-php-extensions \
+    -o /usr/bin/install-php-extensions \
+    && chmod +x /usr/bin/install-php-extensions \
+    && install-php-extensions \
     gd \
     pcntl \
     opcache \
     pdo \
+    pdo_pgsql \
+    pgsql \
     pdo_mysql \
     redis
 
+# Copy Composer binary
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
+# Set working directory
 WORKDIR /var/www/html
 
-# Copy the Laravel application files into the container.
+# Copy the Laravel application files into the container
 COPY . .
 
-# Start with base PHP config, then add extensions.
-COPY ./.docker/php/php.ini /usr/local/etc/php/
-COPY ./.docker/etc/supervisor.d/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+# Copy PHP and Supervisor configuration files
+COPY ./docker/php/php.ini /usr/local/etc/php/
+COPY ./docker/etc/supervisor.d/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
-# Install PHP extensions
-RUN pecl install xdebug
+# Install Xdebug extension
+RUN pecl install xdebug \
+    && docker-php-ext-enable xdebug
 
-# Install Laravel dependencies using Composer.
-RUN composer install
+# Install Laravel dependencies using Composer
+RUN composer install --optimize-autoloader --no-dev
 
-# Enable PHP extensions
-RUN docker-php-ext-enable xdebug
-
-# Set permissions for Laravel.
+# Set permissions for Laravel
 RUN chown -R www-data:www-data storage bootstrap/cache
 
+# Expose ports
 EXPOSE 80 443
 
-# Start Supervisor.
-CMD ["/usr/bin/supervisord", "-n", "-c",  "/etc/supervisor/conf.d/supervisord.conf"]
+# Start Supervisor
+CMD ["/usr/bin/supervisord", "-n", "-c", "/etc/supervisor/conf.d/supervisord.conf"]

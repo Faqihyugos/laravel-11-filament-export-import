@@ -7,8 +7,8 @@ services:
             - ${APP_PORT:-8000}:80
             - ${VITE_PORT:-5173}:${VITE_PORT:-5173}
         volumes:
-            - ./:${WORKDIR}
-            - ./vendor/:${WORKDIR}/vendor
+            - ./:${WORKDIR}:delegated
+            - ./vendor/:${WORKDIR}/vendor:delegated
         networks:
             - lara11-beta
         depends_on:
