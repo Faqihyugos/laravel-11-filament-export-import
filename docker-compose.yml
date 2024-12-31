@@ -1,0 +1,35 @@
+services:
+    web:
+        build:
+            context: ./
+            dockerfile: ./docker/php/Dockerfile.local
+        ports:
+            - ${APP_PORT:-8000}:80
+            - ${VITE_PORT:-5173}:${VITE_PORT:-5173}
+        volumes:
+            - ./:${WORKDIR}
+            - ./vendor/:${WORKDIR}/vendor
+        networks:
+            - lara11-beta
+        depends_on:
+            - redis
+          
+    redis:
+        image: redis:alpine
+        ports:
+            - ${FORWARD_REDIS_PORT:-6379}:6379
+        volumes:
+            - ${REDIS_VOLUME_LOCAL:-./database/redis-data}:/data
+        networks:
+            - lara11-beta
+        healthcheck:
+            test:
+                - CMD
+                - redis-cli
+                - ping
+            retries: 3
+            timeout: 5s
+    
+networks:
+    lara11-beta:
+        driver: bridge
